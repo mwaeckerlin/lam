@@ -1,5 +1,6 @@
 """Writes the volumes of an existing installation: a main configuration and a
-server profile in the layout of the old image, before the first request."""
+server profile in the layout of the old image, before the first request.
+SEED_SERVER is the LDAP server the existing profile names."""
 import base64
 import hashlib
 import json
@@ -31,7 +32,7 @@ def main() -> None:
     os.symlink(f"{CONFIG}/config.cfg", f"{DATA}/config/config.cfg")
     os.lchown(f"{DATA}/config/config.cfg", owner.st_uid, owner.st_gid)
     write(f"{DATA}/config/lam.conf", {
-        "ServerURL": "ldap://openldap:389",
+        "ServerURL": os.environ.get("SEED_SERVER", "ldap://openldap:389"),
         "Admins": "cn=admin,dc=example,dc=org",
         "Passwd": ssha(OLD_PASSWORD),
         "defaultLanguage": "en_GB.utf8",

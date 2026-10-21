@@ -1,6 +1,7 @@
 # E2E stack: both images of this project in front of a real OpenLDAP server,
-# three times — configured from the environment on an empty volume, started
-# without LAM_PASSWORD, and started on the volumes of an existing installation.
+# four times — configured from the environment on an empty volume, started
+# without LAM_PASSWORD, started on the volumes of an existing installation
+# without variables, and started on such volumes with variables set.
 name: lam-e2e
 
 x-lam: &lam
@@ -50,9 +51,6 @@ services:
 
   upgrade:
     <<: *lam
-    environment:
-      LDAP_SERVER: ldap://wrong-server:389
-      LAM_PASSWORD: password-that-must-not-be-applied
     volumes:
       - upgrade-config:/etc/ldap-account-manager
       - upgrade-data:/var/lib/ldap-account-manager
@@ -76,6 +74,37 @@ services:
     depends_on:
       - upgrade
 
+  reconfigure:
+    <<: *lam
+    environment:
+      LDAP_SERVER: ldap://openldap:389
+      LAM_LANG: de_DE
+      LAM_PASSWORD: password-set-after-the-installation
+    volumes:
+      - reconfigure-config:/etc/ldap-account-manager
+      - reconfigure-data:/var/lib/ldap-account-manager
+    depends_on:
+      - openldap
+
+  reconfigure-seed:
+    build:
+      context: .
+    command: ["python", "seed_upgrade.py"]
+    environment:
+      SEED_SERVER: ldap://old-server:389
+    volumes:
+      - reconfigure-config:/etc/ldap-account-manager
+      - reconfigure-data:/var/lib/ldap-account-manager
+    depends_on:
+      - reconfigure
+
+  reconfigure-proxy:
+    <<: *lam-proxy
+    environment:
+      PHP_FPM_HOST: reconfigure
+    depends_on:
+      - reconfigure
+
   test-runner:
     build:
       context: .
@@ -83,14 +112,19 @@ services:
       - lam-proxy
       - unconfigured-proxy
       - upgrade-proxy
+      - reconfigure-proxy
     environment:
       LAM_URL: http://lam-proxy:8080
       UNCONFIGURED_URL: http://unconfigured-proxy:8080
       UPGRADE_URL: http://upgrade-proxy:8080
+      RECONFIGURE_URL: http://reconfigure-proxy:8080
     volumes:
       - lam-config:/lam-config:ro
       - lam-data:/lam-data:ro
       - upgrade-config:/upgrade-config:ro
+      - upgrade-data:/upgrade-data:ro
+      - reconfigure-config:/reconfigure-config:ro
+      - reconfigure-data:/reconfigure-data:ro
     command: ["pytest", "-v", "--tb=short"]
 
 volumes:
@@ -98,3 +132,5 @@ volumes:
   lam-data:
   upgrade-config:
   upgrade-data:
+  reconfigure-config:
+  reconfigure-data:

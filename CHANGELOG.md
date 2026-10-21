@@ -1,5 +1,10 @@
 # Changelog
 
+- 2026-10-22 **1.7.3**
+    - Every `LAM_*` and `LDAP_*` variable that is set is applied to the existing configuration on every start, so a changed variable takes effect with a restart; variables that are not set leave what was changed on LAM's configuration pages alone
+    - A set configuration password replaces the old one on the next start
+    - The port of the configuration database must be a number from 1 to 65535
+
 - 2026-10-21 **1.7.2**
     - Every build takes the latest LAM release and the latest `install-php-extensions` instead of fixed versions with fixed checksums
 

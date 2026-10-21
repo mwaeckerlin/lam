@@ -1,6 +1,6 @@
 # Docker Images for LDAP Account Manager
 
-[LDAP Account Manager] (LAM) is a web interface to manage the users, groups and other entries of an LDAP directory such as [mwaeckerlin/openldap]. These images run the current LAM release headless on [mwaeckerlin/php-fpm] and [mwaeckerlin/nginx]: no shell, never root, and configured from environment variables on the first start.
+[LDAP Account Manager] (LAM) is a web interface to manage the users, groups and other entries of an LDAP directory such as [mwaeckerlin/openldap]. These images run the current LAM release headless on [mwaeckerlin/php-fpm] and [mwaeckerlin/nginx]: no shell, never root, and configured from environment variables on every start.
 
 The `Dockerfile` builds these images:
 
@@ -12,14 +12,14 @@ All features are listed in [FEATURES.md](FEATURES.md), all tests in [TESTS.md](T
 
 ## Usage
 
-Open the address of the `lam-proxy` container, `http://localhost:8080/` in the example below. The start page leads to the LAM login; choose the administrator of your directory and log in with its LDAP password. The main configuration and the server profiles are behind *LAM configuration* on the login page; both are protected with the password set in `LAM_PASSWORD` on the first start.
+Open the address of the `lam-proxy` container, `http://localhost:8080/` in the example below. The start page leads to the LAM login; choose the administrator of your directory and log in with its LDAP password. The main configuration and the server profiles are behind *LAM configuration* on the login page; both are protected with the password set in `LAM_PASSWORD`.
 
 
 ## Configuration
 
-The variables are read once, on the first start on an empty volume, and LAM writes the main configuration `config.cfg` and the server profile `lam.conf` from them. From then on both belong to LAM's own configuration pages, and a changed variable changes nothing; to apply the variables again, remove the two files from the volumes. The names and the defaults are those of the official LAM image.
+On the first start on an empty volume, the image writes the main configuration `config.cfg` and the server profile `lam.conf` from all variables below, with their defaults where a variable is not set. On every later start, every variable that is set to a non-empty value, directly or through its `_FILE` variable, is written again into the two files, so a changed variable takes effect with the restart of the container. A variable that is not set leaves its setting in the volume alone: what was changed on LAM's configuration pages stays, unless a variable for that setting is set. `LDAP_DOMAIN` and `LDAP_BASE_DN` also set the values derived from them, the administrator and the suffixes, where `LDAP_USER`, `LDAP_USERS_DN` and `LDAP_GROUPS_DN` are not set. The server profile is the one `config.cfg` names as default. The names and the defaults are those of the official LAM image.
 
-- `LAM_PASSWORD`: password of the main configuration and of the server profile, required on the first start, no default; stored only as a salted hash
+- `LAM_PASSWORD`: password of the main configuration and of the server profile, required on the first start, no default; stored only as a salted hash, which is replaced only when the password no longer matches it
 - `LAM_PASSWORD_FILE`: a file that holds `LAM_PASSWORD`, for Docker secrets
 - `LDAP_SERVER`: address of the LDAP server, several separated by spaces, each starting with `ldap://` or `ldaps://`, default `ldap://ldap:389`
 - `LDAP_DOMAIN`: domain of the directory, default `my-domain.com`
@@ -29,12 +29,12 @@ The variables are read once, on the first start on an empty volume, and LAM writ
 - `LDAP_USER`: the administrator offered on the login page, default `cn=admin,` plus `LDAP_BASE_DN`; `LDAP_USER_FILE` reads it from a file
 - `LAM_LANG`: language of the interface, default `en_US`, for example `de_DE`
 - `LAM_CONFIGURATION_DATABASE`: where LAM keeps its configuration, `files` (default) or `mysql`
-- `LAM_CONFIGURATION_HOST`, `LAM_CONFIGURATION_PORT`, `LAM_CONFIGURATION_DATABASE_NAME`, `LAM_CONFIGURATION_USER`: the database for `mysql`, empty by default
+- `LAM_CONFIGURATION_HOST`, `LAM_CONFIGURATION_PORT`, `LAM_CONFIGURATION_DATABASE_NAME`, `LAM_CONFIGURATION_USER`: the database for `mysql`, empty by default; the port is a number from 1 to 65535
 - `LAM_CONFIGURATION_PASSWORD`: password of that database, no default; `LAM_CONFIGURATION_PASSWORD_FILE` reads it from a file
-- `LAM_SKIP_PRECONFIGURE`: `true` writes no configuration at all, for configuration files you provide yourself; default `false`
+- `LAM_SKIP_PRECONFIGURE`: `true` writes no configuration at all, neither on the first start nor later, for configuration files you provide yourself; default `false`
 - `LAM_DISABLE_TLS_CHECK`: `true` accepts any certificate of the LDAP server, default `false`; see the security trade-offs below
 
-A missing `LAM_PASSWORD` or an invalid value answers every LAM page with status 503 and names the variable; the container log carries the same line.
+A missing `LAM_PASSWORD` on the first start, an invalid value, or a configuration file in the old text format while a variable is set answers every LAM page with status 503 and names the cause; the container log carries the same line.
 
 The nginx image takes the variables of [mwaeckerlin/nginx]; `PHP_FPM_HOST` names the php-fpm container and defaults to `lam`.
 
@@ -134,7 +134,7 @@ The old `mwaeckerlin/lam` (last built 2018) ran LAM 4.4 of Ubuntu 14.04 with Apa
 
 1. Back up both volumes, for example with `docker run --rm -v <config-volume>:/c:ro -v <data-volume>:/d:ro alpine tar czf - /c /d > lam-backup.tgz`.
 2. Convert the configuration with a LAM release between 9.0 and 9.3, which reads the old format and writes the new one on save: start the official image `ldapaccountmanager/lam:9.3` with `LAM_SKIP_PRECONFIGURE=true` on the same two volumes, open *LAM configuration*, save the main configuration, then open and save every server profile. LAM's own upgrade notes list what to check after the jump from 4.4, among them the tree view suffix (7.6), the Unix settings (6.3) and the PDF structures (9.7).
-3. Stop it, run [mwaeckerlin/allow-write-access] on the two volumes, then start the new images with the same volumes. The existing configuration is used as it is; the `LAM_*` and `LDAP_*` variables are only read where `config.cfg` is missing.
+3. Stop it, run [mwaeckerlin/allow-write-access] on the two volumes, then start the new images with the same volumes. The existing configuration is used as it is where no `LAM_*` or `LDAP_*` variable is set; every variable that is set overwrites its setting in the converted files on every start.
 
 Without the conversion, start the new images on new volumes with the variables above and enter the settings of the old server profiles again on the configuration pages.
 
@@ -146,7 +146,7 @@ npm run build
 npm start
 ```
 
-Then open http://localhost:8080/. `npm test` runs the docs contract (every feature has a test), the image contract (both images headless), the module contract (php-fpm and the PHP CLI load every module LAM needs), the config contract (no password in the image, the volumes, the health check) and the end-to-end suite under `tests/e2e/`, which starts both images in front of a real OpenLDAP server and logs in through nginx and php-fpm, on fresh volumes, without a password, and on the volumes of an existing installation.
+Then open http://localhost:8080/. `npm test` runs the docs contract (every feature has a test), the image contract (both images headless), the module contract (php-fpm and the PHP CLI load every module LAM needs), the config contract (no password in the image, the volumes, the health check) and the end-to-end suite under `tests/e2e/`, which starts both images in front of a real OpenLDAP server and logs in through nginx and php-fpm, on fresh volumes, without a password, and on the volumes of an existing installation without and with variables set.
 
 The LAM release is the one download pinned in the `Dockerfile`, with its SHA-256 from the release page of LAM on GitHub; a new release changes the address and the checksum. The PHP module `gettext` is compiled on the official `php:fpm-alpine` in a build stage of its own and copied into the base image, the way [mwaeckerlin/php-fpm] describes it for images built on it.
 
@@ -155,7 +155,7 @@ The images are built and published for amd64 and arm64 by the reusable workflow 
 
 ## Internals
 
-php-fpm runs `preconfigure.php` before every request (`auto_prepend_file`); APCu remembers for the lifetime of php-fpm that it has done its work, so it runs once per start. It restores the missing default files, links `config/config.cfg` to `/etc/ldap-account-manager/config.cfg` where the link is missing, and writes `config.cfg` and the server profile from the samples of the release with the values of the variables. A file is written to a temporary name and linked into place, so two parallel first requests never see half a file and never overwrite each other.
+php-fpm runs `preconfigure.php` before every request (`auto_prepend_file`); APCu remembers for the lifetime of php-fpm that it has done its work, so it runs once per start. It restores the missing default files, links `config/config.cfg` to `/etc/ldap-account-manager/config.cfg` where the link is missing, writes a missing `config.cfg` and server profile from the samples of the release with the values of the variables, and then writes the variables that are set into the existing files, only where a value differs. A new file is written to a temporary name and linked into place, so two parallel first requests never see half a file and never overwrite each other; an existing file is replaced by renaming the temporary file over it. The image presets none of the configuration variables, because a preset value could not be told from one the operator set; the defaults live in `preconfigure.php`.
 
 
 [LDAP Account Manager]: https://www.ldap-account-manager.org/ "LDAP Account Manager"

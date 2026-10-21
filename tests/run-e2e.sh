@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run the LAM e2e test suite: both images of this project in front of a real
 # OpenLDAP server, on fresh volumes and on the volumes of an existing
-# installation.
+# installation, without and with variables set.
 # Usage: bash tests/run-e2e.sh [pytest-args...]
 set -euo pipefail
 
@@ -17,10 +17,11 @@ echo "==> Building test stack..."
 docker compose -f "$COMPOSE" build --quiet
 
 echo "==> Starting services..."
-docker compose -f "$COMPOSE" up -d --remove-orphans openldap lam lam-proxy unconfigured unconfigured-proxy upgrade upgrade-proxy
+docker compose -f "$COMPOSE" up -d --remove-orphans openldap lam lam-proxy unconfigured unconfigured-proxy upgrade upgrade-proxy reconfigure reconfigure-proxy
 
 echo "==> Writing the volumes of an existing installation..."
 docker compose -f "$COMPOSE" run --rm --no-deps upgrade-seed
+docker compose -f "$COMPOSE" run --rm --no-deps reconfigure-seed
 
 echo "==> Running tests..."
 EXIT=0

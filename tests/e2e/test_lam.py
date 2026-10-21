@@ -5,8 +5,8 @@ import os
 import pytest
 import requests
 
-from conftest import (LAM_PASSWORD, LAM_URL, LDAP_ADMIN, LDAP_PASSWORD, OLD_PASSWORD,
-                      UNCONFIGURED_URL, UPGRADE_URL, lam_login, main_login)
+from conftest import (LAM_PASSWORD, LAM_URL, LDAP_ADMIN, LDAP_PASSWORD, NEW_PASSWORD, OLD_PASSWORD,
+                      RECONFIGURE_URL, UNCONFIGURED_URL, UPGRADE_URL, lam_login, main_login, ssha_matches)
 
 
 def test_root_redirects_to_login():
@@ -117,12 +117,58 @@ def test_static_page_without_password_still_served():
 def test_existing_installation_keeps_its_configuration():
     with open("/upgrade-config/config.cfg") as f:
         before = f.read()
+    assert ssha_matches(OLD_PASSWORD, json.loads(before)["password"])
     assert main_login(UPGRADE_URL, OLD_PASSWORD).text.count("mainmanage.php") > 0
-    assert "mainmanage.php" not in main_login(UPGRADE_URL, "password-that-must-not-be-applied").text
     with open("/upgrade-config/config.cfg") as f:
         assert f.read() == before
 
 
 def test_existing_installation_keeps_its_ldap_server():
+    with open("/upgrade-data/config/lam.conf") as f:
+        profile = json.load(f)
+    assert profile["ServerURL"] == "ldap://openldap:389"
+    assert profile["defaultLanguage"] == "en_GB.utf8"
+    assert ssha_matches(OLD_PASSWORD, profile["Passwd"])
     r = lam_login(UPGRADE_URL, LDAP_ADMIN, LDAP_PASSWORD)
     assert "main.php" in r.text, r.text[:2000]
+
+
+def test_set_variables_override_the_existing_configuration():
+    with open("/reconfigure-data/config/lam.conf") as f:
+        profile = json.load(f)
+    assert profile["ServerURL"] == "ldap://openldap:389"
+    assert profile["defaultLanguage"] == "de_DE.utf8"
+    assert ssha_matches(NEW_PASSWORD, profile["Passwd"])
+    with open("/reconfigure-config/config.cfg") as f:
+        main = json.load(f)
+    assert ssha_matches(NEW_PASSWORD, main["password"])
+    assert NEW_PASSWORD not in json.dumps(main) + json.dumps(profile)
+
+
+def test_set_password_opens_the_main_configuration():
+    assert "mainmanage.php" in main_login(RECONFIGURE_URL, NEW_PASSWORD).text
+    assert "mainmanage.php" not in main_login(RECONFIGURE_URL, OLD_PASSWORD).text
+
+
+def test_set_ldap_server_is_used_for_the_login():
+    r = lam_login(RECONFIGURE_URL, LDAP_ADMIN, LDAP_PASSWORD)
+    assert "main.php" in r.text, r.text[:2000]
+
+
+def test_unset_variables_leave_the_existing_configuration_alone():
+    with open("/reconfigure-data/config/lam.conf") as f:
+        profile = json.load(f)
+    assert profile["Admins"] == "cn=admin,dc=example,dc=org"
+    assert profile["activeTypes"] == "user,group"
+    assert profile["loginMethod"] == "list"
+    assert profile["typeSettings"] == {
+        "suffix_user": "dc=example,dc=org",
+        "modules_user": "inetOrgPerson,posixAccount,shadowAccount",
+        "suffix_group": "dc=example,dc=org",
+        "modules_group": "posixGroup",
+    }
+    assert profile["toolSettings"] == {"treeViewSuffix": "dc=example,dc=org"}
+    with open("/reconfigure-config/config.cfg") as f:
+        main = json.load(f)
+    assert set(main) == {"default", "password", "configDatabaseType"}
+    assert main["configDatabaseType"] == "files"

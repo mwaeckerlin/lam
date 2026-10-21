@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Config contract: the image ships no password, prepares LAM before every
+# Config contract: the image ships no password and presets no configuration
+# variable (a preset value would count as set by the operator and overwrite
+# the configuration in the volumes on every start), prepares LAM before every
 # request, and keeps the volumes of the old image.
 #
 # Usage: tests/config-contract.sh IMAGE
@@ -21,7 +23,8 @@ if ! docker image inspect "${IMAGE}" > /dev/null 2>&1; then
     _fail "${IMAGE}_image_exists" "image not built — run 'npm run build' first"
 else
     ENVIRONMENT=$(docker image inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "${IMAGE}")
-    for name in LAM_PASSWORD LAM_CONFIGURATION_PASSWORD; do
+    for name in LAM_PASSWORD LAM_CONFIGURATION_PASSWORD LAM_LANG LDAP_SERVER LDAP_DOMAIN LDAP_BASE_DN LDAP_USERS_DN LDAP_GROUPS_DN LDAP_USER \
+            LAM_CONFIGURATION_DATABASE LAM_CONFIGURATION_HOST LAM_CONFIGURATION_PORT LAM_CONFIGURATION_DATABASE_NAME LAM_CONFIGURATION_USER; do
         if grep -q "^${name}=" <<< "${ENVIRONMENT}"; then
             _fail "no_default_${name,,}" "the image sets ${name}"
         else

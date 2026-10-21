@@ -1,4 +1,6 @@
 """Shared settings, helpers and the readiness wait of the LAM stack."""
+import base64
+import hashlib
 import os
 import re
 import time
@@ -9,11 +11,13 @@ import requests
 LAM_URL = os.environ.get("LAM_URL", "http://lam-proxy:8080")
 UNCONFIGURED_URL = os.environ.get("UNCONFIGURED_URL", "http://unconfigured-proxy:8080")
 UPGRADE_URL = os.environ.get("UPGRADE_URL", "http://upgrade-proxy:8080")
+RECONFIGURE_URL = os.environ.get("RECONFIGURE_URL", "http://reconfigure-proxy:8080")
 
 LAM_PASSWORD = "lam-e2e-password"
 LDAP_ADMIN = "cn=admin,dc=example,dc=org"
 LDAP_PASSWORD = "ldap-test-password"
 OLD_PASSWORD = "password-of-the-old-installation"
+NEW_PASSWORD = "password-set-after-the-installation"
 
 
 def wait_for_http(url: str, timeout: int = 120) -> None:
@@ -45,6 +49,15 @@ def lam_login(url: str, username: str, password: str) -> requests.Response:
     return answer
 
 
+def ssha_matches(password: str, stored: str) -> bool:
+    """True where the {SSHA} hash LAM stores belongs to the password."""
+    match = re.fullmatch(r"\{SSHA\}(\S+) (\S+)", stored)
+    if not match:
+        return False
+    salt = base64.b64decode(match.group(2))
+    return base64.b64decode(match.group(1)) == hashlib.sha1(password.encode() + salt).digest()
+
+
 def main_login(url: str, password: str) -> requests.Response:
     """Logs in to the main configuration with the master password."""
     session = requests.Session()
@@ -55,5 +68,5 @@ def main_login(url: str, password: str) -> requests.Response:
 
 @pytest.fixture(scope="session", autouse=True)
 def wait_for_services():
-    for url in (LAM_URL, UNCONFIGURED_URL, UPGRADE_URL):
+    for url in (LAM_URL, UNCONFIGURED_URL, UPGRADE_URL, RECONFIGURE_URL):
         wait_for_http(url + "/templates/login.php")

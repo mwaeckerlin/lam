@@ -1,6 +1,6 @@
 {
   "name": "@mwaeckerlin/lam",
-  "version": "1.7.2",
+  "version": "1.7.3",
   "scripts": {
     "build": "docker compose build",
     "start": "docker compose up --build --force-recreate --remove-orphans",

@@ -1,5 +1,8 @@
 # Changelog
 
+- 2026-10-21 **1.7.2**
+    - Every build takes the latest LAM release and the latest `install-php-extensions` instead of fixed versions with fixed checksums
+
 - 2026-10-21 **1.7.1**
     - LDAP Account Manager 9.7 on PHP 8, rebuilt headless in two images: `mwaeckerlin/lam:nginx` serves the static files on port 8080, `mwaeckerlin/lam:php-fpm` runs LAM; no shell, never root, published for amd64 and arm64 and rebuilt every week
     - The first start on an empty volume writes the main configuration and the server profile from environment variables with the names and defaults of the official LAM image; the password is required and stored only as a hash, and can come from a Docker secret

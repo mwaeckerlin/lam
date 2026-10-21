@@ -111,7 +111,7 @@ The php-fpm image reports itself healthy while php-fpm accepts connections on po
 
 ## Upgrade from the old image
 
-The old `mwaeckerlin/lam` (last built 2018) ran LAM 4.4 of Ubuntu 14.04 with Apache and PHP 5 in one container. The new images run LAM 9.7 on PHP 8.
+The old `mwaeckerlin/lam` (last built 2018) ran LAM 4.4 of Ubuntu 14.04 with Apache and PHP 5 in one container. The new images run the latest LAM release on PHP 8.
 
 ### What stays
 

@@ -1,0 +1,16 @@
+# the modules LDAP Account Manager needs, from its manual (required: ldap, gettext, xml, openssl) and the features of the image
+apcu
+curl
+gd
+gettext
+gmp
+iconv
+imagick
+json
+ldap
+mbstring
+openssl
+session
+xml
+zip
+zlib

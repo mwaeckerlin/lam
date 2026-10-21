@@ -1,0 +1,39 @@
+services:
+  lam-proxy:
+    image: mwaeckerlin/lam:nginx
+    build:
+      context: .
+      target: nginx
+    ports:
+      - 8080:8080
+    networks:
+      - frontend
+
+  lam:
+    image: mwaeckerlin/lam:php-fpm
+    build:
+      context: .
+      target: php-fpm
+    environment:
+      LDAP_SERVER: ldap://openldap:389
+      LDAP_DOMAIN: example.org
+      # the local example only; set a password of your own
+      LAM_PASSWORD: change-me
+    volumes:
+      - type: volume
+        source: config
+        target: /etc/ldap-account-manager
+      - type: volume
+        source: data
+        target: /var/lib/ldap-account-manager
+    networks:
+      - frontend
+      - backend
+
+networks:
+  frontend:
+  backend:
+
+volumes:
+  config:
+  data:

@@ -1,0 +1,100 @@
+# E2E stack: both images of this project in front of a real OpenLDAP server,
+# three times — configured from the environment on an empty volume, started
+# without LAM_PASSWORD, and started on the volumes of an existing installation.
+name: lam-e2e
+
+x-lam: &lam
+  image: mwaeckerlin/lam:php-fpm
+  build:
+    context: ../..
+    target: php-fpm
+
+x-lam-proxy: &lam-proxy
+  image: mwaeckerlin/lam:nginx
+  build:
+    context: ../..
+    target: nginx
+
+services:
+
+  openldap:
+    build:
+      context: openldap
+
+  lam:
+    <<: *lam
+    environment:
+      LDAP_SERVER: ldap://openldap:389
+      LDAP_DOMAIN: example.org
+      LAM_PASSWORD: lam-e2e-password
+    volumes:
+      - lam-config:/etc/ldap-account-manager
+      - lam-data:/var/lib/ldap-account-manager
+    depends_on:
+      - openldap
+
+  lam-proxy:
+    <<: *lam-proxy
+    depends_on:
+      - lam
+
+  unconfigured:
+    <<: *lam
+
+  unconfigured-proxy:
+    <<: *lam-proxy
+    environment:
+      PHP_FPM_HOST: unconfigured
+    depends_on:
+      - unconfigured
+
+  upgrade:
+    <<: *lam
+    environment:
+      LDAP_SERVER: ldap://wrong-server:389
+      LAM_PASSWORD: password-that-must-not-be-applied
+    volumes:
+      - upgrade-config:/etc/ldap-account-manager
+      - upgrade-data:/var/lib/ldap-account-manager
+    depends_on:
+      - openldap
+
+  upgrade-seed:
+    build:
+      context: .
+    command: ["python", "seed_upgrade.py"]
+    volumes:
+      - upgrade-config:/etc/ldap-account-manager
+      - upgrade-data:/var/lib/ldap-account-manager
+    depends_on:
+      - upgrade
+
+  upgrade-proxy:
+    <<: *lam-proxy
+    environment:
+      PHP_FPM_HOST: upgrade
+    depends_on:
+      - upgrade
+
+  test-runner:
+    build:
+      context: .
+    depends_on:
+      - lam-proxy
+      - unconfigured-proxy
+      - upgrade-proxy
+    environment:
+      LAM_URL: http://lam-proxy:8080
+      UNCONFIGURED_URL: http://unconfigured-proxy:8080
+      UPGRADE_URL: http://upgrade-proxy:8080
+    volumes:
+      - lam-config:/lam-config:ro
+      - lam-data:/lam-data:ro
+      - upgrade-config:/upgrade-config:ro
+    command: ["pytest", "-v", "--tb=short"]
+
+volumes:
+  lam-config:
+  lam-data:
+  upgrade-config:
+  upgrade-data:

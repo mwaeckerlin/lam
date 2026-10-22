@@ -102,6 +102,7 @@ The LDAP server joins the network `backend`. A reverse proxy that terminates TLS
 - **`LAM_DISABLE_TLS_CHECK=true` switches off the certificate check** of the LDAP connection (`LDAPTLS_REQCERT=never`): anybody between LAM and the LDAP server can then read the administrator password. Use it only for a test server with a self-signed certificate.
 - **Only the static files of LAM reach nginx.** The configuration, the sessions, the temporary files and the PHP sources are not in the nginx image, so nginx answers 404 for them; LAM delivers its temporary files through PHP.
 - **The PHP environment is visible to PHP**, as [mwaeckerlin/php-fpm] describes; prefer the `_FILE` variables for passwords.
+- **Session upload progress and fatal error backtraces stay off**, locked in the php-fpm pool by [mwaeckerlin/php-fpm] against CVE-2026-109618 and CVE-2026-109619.
 
 
 ### Health check
@@ -146,9 +147,9 @@ npm run build
 npm start
 ```
 
-Then open http://localhost:8080/. `npm test` runs the docs contract (every feature has a test), the image contract (both images headless), the module contract (php-fpm and the PHP CLI load every module LAM needs), the config contract (no password in the image, the volumes, the health check) and the end-to-end suite under `tests/e2e/`, which starts both images in front of a real OpenLDAP server and logs in through nginx and php-fpm, on fresh volumes, without a password, and on the volumes of an existing installation without and with variables set.
+Then open http://localhost:8080/. `npm test` runs the docs contract (every feature has a test), the image contract (both images headless), the module contract (php-fpm and the PHP CLI load every module LAM needs), the config contract (no password in the image, the volumes, the health check, session upload progress and fatal error backtraces locked off) and the end-to-end suite under `tests/e2e/`, which starts both images in front of a real OpenLDAP server and logs in through nginx and php-fpm, on fresh volumes, without a password, and on the volumes of an existing installation without and with variables set.
 
-The LAM release is the one download pinned in the `Dockerfile`, with its SHA-256 from the release page of LAM on GitHub; a new release changes the address and the checksum. The PHP module `gettext` is compiled on the official `php:fpm-alpine` in a build stage of its own and copied into the base image, the way [mwaeckerlin/php-fpm] describes it for images built on it.
+Every build downloads the latest LAM release from LAM's release page on GitHub. The PHP module `gettext` is compiled on the official `php:fpm-alpine` in a build stage of its own and copied into the base image, the way [mwaeckerlin/php-fpm] describes it for images built on it.
 
 The images are built and published for amd64 and arm64 by the reusable workflow of [mwaeckerlin/scratch].
 

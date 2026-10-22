@@ -2,7 +2,9 @@
 # Config contract: the image ships no password and presets no configuration
 # variable (a preset value would count as set by the operator and overwrite
 # the configuration in the volumes on every start), prepares LAM before every
-# request, and keeps the volumes of the old image.
+# request, keeps the volumes of the old image, and keeps session upload
+# progress and fatal error backtraces off and locked as mwaeckerlin/php-fpm
+# sets them.
 #
 # Usage: tests/config-contract.sh IMAGE
 
@@ -51,6 +53,24 @@ else
         _pass "preconfigure_syntax"
     else
         _fail "preconfigure_syntax" "$(docker run --rm --pull=never --entrypoint /usr/bin/php "${IMAGE}" -l /usr/local/lib/lam/preconfigure.php 2>&1)"
+    fi
+
+    # CVE-2026-109618 and CVE-2026-109619, inherited from mwaeckerlin/php-fpm
+    if grep -Eiq 'session\.upload_progress\.enabled( => |</td><td class="v">)(Off|0)' <<< "${INFO}"; then
+        _pass "session_upload_progress_off"
+    else
+        _fail "session_upload_progress_off" "$(grep -i 'session.upload_progress.enabled' <<< "${INFO}" || echo 'setting not reported')"
+    fi
+    CONFIG=$(docker run --rm --pull=never "${IMAGE}" -tt 2>&1)
+    if grep -Eq 'session\.upload_progress\.enabled\] = (off|no|0)' <<< "${CONFIG}"; then
+        _pass "session_upload_progress_locked"
+    else
+        _fail "session_upload_progress_locked" "the pool does not lock session.upload_progress.enabled off"
+    fi
+    if grep -Eq 'fatal_error_backtraces\] = (off|no|0)' <<< "${CONFIG}"; then
+        _pass "fatal_error_backtraces_locked"
+    else
+        _fail "fatal_error_backtraces_locked" "the pool does not lock fatal_error_backtraces off"
     fi
 
     HEALTH=$(docker image inspect --format '{{json .Config.Healthcheck.Test}}' "${IMAGE}")

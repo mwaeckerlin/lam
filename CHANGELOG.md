@@ -1,5 +1,8 @@
 # Changelog
 
+- 2026-10-22 **1.7.4**
+    - The PHP image keeps session upload progress and fatal error backtraces off and locked, as the base image sets them against CVE-2026-109618 and CVE-2026-109619, and the test suite proves it in the image itself
+
 - 2026-10-22 **1.7.3**
     - Every `LAM_*` and `LDAP_*` variable that is set is applied to the existing configuration on every start, so a changed variable takes effect with a restart; variables that are not set leave what was changed on LAM's configuration pages alone
     - A set configuration password replaces the old one on the next start

@@ -37,6 +37,7 @@ The e2e stack (`tests/e2e/`) runs both images of this project in front of a real
 - **F7** `tests/image-contract.sh` › not_root — both images run as an unprivileged user.
 - **F8** `tests/config-contract.sh` › healthcheck_declared — the php-fpm image declares its health check.
 - **F10** `tests/config-contract.sh` › no_default_lam_lang, no_default_ldap_server, no_default_ldap_domain, no_default_ldap_base_dn, no_default_ldap_users_dn, no_default_ldap_groups_dn, no_default_ldap_user, no_default_lam_configuration_database, no_default_lam_configuration_host, no_default_lam_configuration_port, no_default_lam_configuration_database_name, no_default_lam_configuration_user — the image presets none of the configuration variables, so only a value the operator sets is applied to an existing configuration.
+- **F11** `tests/config-contract.sh` › session_upload_progress_off, session_upload_progress_locked, fatal_error_backtraces_locked — `php-fpm -i` reports `session.upload_progress.enabled` Off, and `php-fpm -tt` shows the pool locking it and `fatal_error_backtraces` off.
 
 ## Workflow contract
 
